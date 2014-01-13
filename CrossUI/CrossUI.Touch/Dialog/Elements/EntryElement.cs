@@ -95,6 +95,24 @@ namespace CrossUI.Touch.Dialog.Elements
             }
         }
 
+        private UITextAlignment _textalignment = UITextAlignment.Left;
+
+        public UITextAlignment TextAlignment
+        {
+            get
+            {
+                return _textalignment;
+            }
+            set
+            {
+                _textalignment = value;
+                if (_entry != null)
+                {
+                    _entry.TextAlignment = _textalignment;
+                }
+            }
+        }
+
         private readonly bool isPassword;
         private bool _becomeResponder;
         private UITextField _entry;
@@ -166,7 +184,8 @@ namespace CrossUI.Touch.Dialog.Elements
         /// <param name="isPassword">
         /// True if this should be used to enter a password.
         /// </param>
-        public EntryElement(string caption, string placeholder, string value, bool isPassword) : base(caption)
+        public EntryElement(string caption, string placeholder, string value, bool isPassword)
+            : base(caption)
         {
             Value = value;
             this.isPassword = isPassword;
@@ -204,7 +223,12 @@ namespace CrossUI.Touch.Dialog.Elements
                         max = size;
                 }
             }
-            s.EntryAlignment = new SizeF(25 + Math.Min(max.Width, 160), max.Height);
+
+            if (TextAlignment == UITextAlignment.Left)
+                s.EntryAlignment = new SizeF(25 + Math.Min(max.Width, (cell.Frame.Width - 100)), max.Height);
+            else
+                s.EntryAlignment = new SizeF(25 + Math.Min(max.Width, (cell.Frame.Width / 2f)), max.Height);
+
             return s.EntryAlignment;
         }
 
@@ -216,7 +240,8 @@ namespace CrossUI.Touch.Dialog.Elements
                     Placeholder = placeholder ?? "",
                     SecureTextEntry = isPassword,
                     Text = Value ?? "",
-                    Tag = 1
+                    Tag = 1,
+                    TextAlignment = TextAlignment
                 };
         }
 
@@ -238,13 +263,27 @@ namespace CrossUI.Touch.Dialog.Elements
             else
                 RemoveTag(cell, 1);
 
+            var offset = (UIDevice.CurrentDevice.UserInterfaceIdiom == UIUserInterfaceIdiom.Phone) ? 20 : 90;
+            cell.Frame = new RectangleF(cell.Frame.X, cell.Frame.Y, tv.Frame.Width - offset, cell.Frame.Height);
+
+            if (UIDevice.CurrentDevice.CheckSystemVersion(7, 0) == true)
+                cell.ContentView.Frame = new RectangleF(cell.ContentView.Frame.X, cell.ContentView.Frame.Y, tv.Frame.Width - offset, cell.ContentView.Frame.Height);
+
+            SizeF size = ComputeEntryPosition(tv, cell);
+            float yOffset = (cell.ContentView.Bounds.Height - size.Height) / 2 - 1;
+            float width = cell.ContentView.Bounds.Width - size.Width;
+
+            if (TextAlignment == UITextAlignment.Right)
+            {
+                // Add padding if right aligned
+                width -= 10;
+            }
+
+            var entryFrame = new RectangleF(size.Width, yOffset, width, size.Height);
+
             if (_entry == null)
             {
-                SizeF size = ComputeEntryPosition(tv, cell);
-                float yOffset = (cell.ContentView.Bounds.Height - size.Height)/2 - 1;
-                float width = cell.ContentView.Bounds.Width - size.Width;
-
-                _entry = CreateTextField(new RectangleF(size.Width, yOffset, width, size.Height));
+                _entry = CreateTextField(entryFrame);
 
                 _entry.ValueChanged += delegate { FetchAndUpdateValue(); };
                 _entry.EditingChanged += delegate { FetchAndUpdateValue(); };
@@ -281,6 +320,9 @@ namespace CrossUI.Touch.Dialog.Elements
                         tv.ScrollToRow(IndexPath, UITableViewScrollPosition.Middle, true);
                     };
             }
+            else
+                _entry.Frame = entryFrame;
+
             if (_becomeResponder)
             {
                 _entry.BecomeFirstResponder();
